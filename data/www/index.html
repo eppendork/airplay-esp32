@@ -85,6 +85,12 @@ input:focus{outline:none;border-color:#e94560}
 <div id='dual-msg'></div></div>
 <div id='eq-link' style='display:none;margin-top:18px'>
 <a href='/eq' class='btn btn-secondary'>EQ Settings</a></div>
+<div class='form-group' style='margin-top:18px'><label for='sync-offset-slider'>Audio Sync Offset (ms)</label>
+<div class='slider-row'><input type='range' id='sync-offset-slider' min='-500' max='500' value='0' oninput='document.getElementById("sync-offset-input").value=this.value'>
+<input type='text' id='sync-offset-input' value='0' style='width:60px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#fff;padding:8px;text-align:center;font-size:14px' oninput='document.getElementById("sync-offset-slider").value=this.value'>
+<span>ms</span></div></div>
+<button class='btn btn-secondary' onclick='saveSyncOffset()'>Save Offset</button>
+<div id='sync-msg'></div>
 </div>
 <div class='card'><h2>Firmware Update</h2>
 <div class='file-row'><input type='file' id='fw-file' accept='.bin' style='display:none'>
@@ -144,6 +150,20 @@ async function saveBrightness(){
   try{var r=await fetch('/api/led/brightness',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({brightness:v})});
     var d=await r.json();if(d.success){msg('brightness-msg','Saved!','ok');}else{msg('brightness-msg',d.error,'err');}}
   catch(e){msg('brightness-msg','Error','err');console.error('saveBrightness failed',e);}}
+async function loadSyncOffset(){
+  try{var r=await fetch('/api/audio/sync-offset');var d=await r.json();
+    if(d.success){
+      var v = d.offset_ms || 0;
+      document.getElementById('sync-offset-slider').value = v;
+      document.getElementById('sync-offset-input').value = v;
+    }}
+  catch(e){console.warn('Could not load sync offset',e);}}
+async function saveSyncOffset(){
+  var v = Number.parseInt(document.getElementById('sync-offset-input').value, 10);
+  if(isNaN(v)){msg('sync-msg','Enter a valid number','err');return;}
+  try{var r=await fetch('/api/audio/sync-offset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({offset_ms:v})});
+    var d=await r.json();if(d.success){msg('sync-msg','Saved!','ok');}else{msg('sync-msg',d.error,'err');}}
+  catch(e){msg('sync-msg','Error','err');console.error('saveSyncOffset failed',e);}}
 async function loadChannel(){
   try{var r=await fetch('/api/audio/channel');var d=await r.json();
     if(d.success){document.getElementById('chan-mode').value=String(d.mode);
@@ -249,5 +269,5 @@ window.onload=function(){
   document.getElementById('fw-file').onchange=function(e){var f=e.target.files[0];
     document.getElementById('fw-name').textContent=f?f.name:'No file selected';
     document.getElementById('ota-btn').disabled=!f;};
-  loadInfo();loadBrightness();loadChannel();setInterval(loadInfo,30000);};
+  loadInfo();loadBrightness();loadChannel();loadSyncOffset();setInterval(loadInfo,30000);};
 </script></body></html>

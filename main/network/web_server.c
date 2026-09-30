@@ -20,6 +20,9 @@
 #include "log_stream.h"
 #include "rtsp_server.h"
 #include "audio_output.h"
+
+#include "audio_timing.h"
+
 #include "esp_app_desc.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
@@ -475,6 +478,67 @@ static esp_err_t channel_mode_post_handler(httpd_req_t *req) {
   } else {
     cJSON_AddBoolToObject(response, "success", false);
     cJSON_AddStringToObject(response, "error", "Expected {\"mode\": 0-3}");
+  }
+
+  char *json_str = cJSON_Print(response);
+  httpd_resp_set_type(req, "application/json");
+  httpd_resp_send(req, json_str, HTTPD_RESP_USE_STRLEN);
+  free(json_str);
+  cJSON_Delete(json);
+  cJSON_Delete(response);
+  return ESP_OK;
+}
+
+/* ================================================================== */
+/*  Sync Offset API                                                   */
+/* ================================================================== */
+
+static esp_err_t sync_offset_get_handler(httpd_req_t *req) {
+  int32_t offset_ms = 0;
+  settings_get_sync_offset(&offset_ms);
+
+  cJSON *json = cJSON_CreateObject();
+  cJSON_AddNumberToObject(json, "offset_ms", (double)offset_ms);
+  cJSON_AddBoolToObject(json, "success", true);
+
+  char *json_str = cJSON_Print(json);
+  httpd_resp_set_type(req, "application/json");
+  httpd_resp_send(req, json_str, HTTPD_RESP_USE_STRLEN);
+  free(json_str);
+  cJSON_Delete(json);
+  return ESP_OK;
+}
+
+static esp_err_t sync_offset_post_handler(httpd_req_t *req) {
+  char *content = recv_body(req, 128);
+  if (!content) {
+    httpd_resp_send_500(req);
+    return ESP_FAIL;
+  }
+
+  cJSON *json = cJSON_Parse(content);
+  free(content);
+  if (!json) {
+    httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+    return ESP_FAIL;
+  }
+
+  cJSON *response = cJSON_CreateObject();
+  cJSON *val = cJSON_GetObjectItem(json, "offset_ms");
+
+  if (val && cJSON_IsNumber(val)) {
+    int32_t offset = (int32_t)val->valuedouble;
+    
+    // Optional bounds checking
+    if (offset < -500) offset = -500;
+    if (offset > 500) offset = 500;
+
+    settings_set_sync_offset(offset);
+    audio_timing_set_sync_offset(offset);
+    cJSON_AddBoolToObject(response, "success", true);
+  } else {
+    cJSON_AddBoolToObject(response, "success", false);
+    cJSON_AddStringToObject(response, "error", "Expected {\"offset_ms\": number}");
   }
 
   char *json_str = cJSON_Print(response);
@@ -1307,7 +1371,7 @@ esp_err_t web_server_start(uint16_t port) {
 #endif
   config.lru_purge_enable = true; // Reclaim stale sockets when all are in use
   config.max_uri_handlers =
-      30; // Room for captive portal + EQ + speedtest + brightness + channel
+      32; // Room for captive portal + EQ + speedtest + brightness + channel (default 30)
 #ifdef DAC_HAS_SUB_OFFSET
   config.max_uri_handlers += 2; // sub level get/post
 #endif
@@ -1392,6 +1456,16 @@ esp_err_t web_server_start(uint16_t port) {
                                        .method = HTTP_POST,
                                        .handler = channel_mode_post_handler};
   httpd_register_uri_handler(s_server, &channel_mode_post_uri);
+
+  httpd_uri_t sync_offset_get_uri = {.uri = "/api/audio/sync-offset",
+                                     .method = HTTP_GET,
+                                     .handler = sync_offset_get_handler};
+  httpd_register_uri_handler(s_server, &sync_offset_get_uri);
+
+  httpd_uri_t sync_offset_post_uri = {.uri = "/api/audio/sync-offset",
+                                      .method = HTTP_POST,
+                                      .handler = sync_offset_post_handler};
+  httpd_register_uri_handler(s_server, &sync_offset_post_uri);
 
 #ifdef DAC_HAS_SUB_OFFSET
   httpd_uri_t sub_offset_get_uri = {.uri = "/api/audio/sub",

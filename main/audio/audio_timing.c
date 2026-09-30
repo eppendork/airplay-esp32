@@ -131,6 +131,12 @@ typedef enum {
   SYNC_MODE_NTP,  // AirPlay 1 NTP sync
 } sync_mode_t;
 
+static int64_t s_user_offset_ns = 0;
+
+void audio_timing_set_sync_offset(int32_t offset_ms) {
+    s_user_offset_ns = (int64_t)offset_ms * 1000000LL;
+}
+
 // Compute how early (positive) or late (negative) a frame is in microseconds
 static bool compute_early_us(const audio_timing_t *timing,
                              const audio_format_t *format,
@@ -171,7 +177,8 @@ static bool compute_early_us(const audio_timing_t *timing,
   case SYNC_MODE_PTP:
     // AirPlay 2: use network time with PTP offset for multi-room sync
     target_ns = (int64_t)timing->anchor_network_time_ns -
-                ptp_clock_get_offset_ns() + frame_offset_ns + latency_ns;
+                ptp_clock_get_offset_ns() + frame_offset_ns + latency_ns
+                + s_user_offset_ns; //willy adjust for -100.5ms = - 100500000LL
     break;
   case SYNC_MODE_NTP:
     // AirPlay 1: use network time with NTP offset for multi-room sync

@@ -17,6 +17,7 @@
 #include "log_stream.h"
 #include "wifi.h"
 #include "spiffs_storage.h"
+#include "audio_timing.h"
 
 #ifdef CONFIG_BT_A2DP_ENABLE
 #include "a2dp_sink.h"
@@ -218,6 +219,9 @@ void app_main(void) {
   }
   ESP_ERROR_CHECK(ret);
   ESP_ERROR_CHECK(settings_init());
+  int32_t sync_offset_ms = 0;
+  settings_get_sync_offset(&sync_offset_ms);
+  audio_timing_set_sync_offset(sync_offset_ms);
 #ifdef CONFIG_DAC_TAS57XX
   // Load persisted sub level offset (pre-init safe; applied on first volume).
   float sub_off;

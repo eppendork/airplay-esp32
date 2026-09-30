@@ -120,3 +120,5 @@ void audio_timing_set_playing(audio_timing_t *timing, bool playing);
 size_t audio_timing_read(audio_timing_t *timing, audio_buffer_t *buffer,
                          const audio_stream_t *stream, audio_stats_t *stats,
                          int16_t *out, size_t samples);
+
+void audio_timing_set_sync_offset(int32_t offset_ms);

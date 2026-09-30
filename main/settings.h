@@ -173,6 +173,11 @@ esp_err_t settings_get_channel_mode(uint8_t *mode);
  */
 esp_err_t settings_set_channel_mode(uint8_t mode);
 
+// ---- Audio sync offset ----
+
+esp_err_t settings_get_sync_offset(int32_t *offset_ms);
+esp_err_t settings_set_sync_offset(int32_t offset_ms);
+
 // ---- Sub level offset ----
 
 /**
